@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<title>Цэцэгсийн бүлгэм</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: manipulation; cursor: crosshair; }
+  #cb { filter: blur(2.5px); pointer-events: none; opacity: .8; }
+  #hint {
+    position: fixed; left: 0; right: 0; top: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px 0;
+    text-align: center; color: #cfc6d8; font: 15px/1.4 Georgia, "Times New Roman", serif;
+    letter-spacing: .02em; pointer-events: none; transition: opacity 2s;
+  }
+  #hint.off { opacity: 0; }
+  #gold {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+    transform: translateX(-50%); padding: 14px 30px; border: 0; border-radius: 999px;
+    background: linear-gradient(#ffe68a, #d9a21b); color: #3a2800;
+    font: 700 17px Georgia, "Times New Roman", serif; letter-spacing: .03em; cursor: pointer;
+    box-shadow: 0 0 22px rgba(255, 200, 60, .55); opacity: 0; pointer-events: none; transition: opacity 1.5s;
+  }
+  #gold.show { opacity: 1; pointer-events: auto; }
+  #gold:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #msg {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+    transform: translateX(-50%); width: min(86vw, 520px); box-sizing: border-box;
+    padding: 16px 22px; border-radius: 16px; background: rgba(0, 0, 0, .62);
+    color: #ffe9a8; text-align: center; font: 20px/1.45 Georgia, "Times New Roman", serif;
+    opacity: 0; pointer-events: none; transition: opacity .6s;
+  }
+  #msg.show { opacity: 1; }
+</style>
+</head>
+<body>
+<canvas id="cb"></canvas>
+<canvas id="c"></canvas>
+<div id="hint">Дэлгэц дээр дарж цэцэг тарь</div>
+<div id="msg" aria-live="polite"></div>
+<button id="gold" type="button">Танд 💛</button>
+<script>
+const cv = document.getElementById('c'), cb = document.getElementById('cb');
+const ctxF = cv.getContext('2d'), ctxB = cb.getContext('2d');
+let ctx = ctxF;
+let W, H, DPR;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = cb.width = W * DPR; cv.height = cb.height = H * DPR;
+  ctxF.setTransform(DPR, 0, 0, DPR, 0, 0); ctxB.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+const TAU = Math.PI * 2, GOLD = 2.39996;
+const ease = t => 1 - Math.pow(1 - Math.min(Math.max(t, 0), 1), 3);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const TYPES = ['daisy', 'sunflower', 'tulip', 'cherry', 'rose', 'lavender'];
+
+function petal(len, wid) {
+  ctx.beginPath(); ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(wid, -len * .3, wid, -len * .9, 0, -len);
+  ctx.bezierCurveTo(-wid, -len * .9, -wid, -len * .3, 0, 0);
+  ctx.fill();
+}
+
+const drawers = {
+  daisy(S, p, f) {
+    ctx.fillStyle = '#f4f1ff';
+    for (let i = 0; i < 16; i++) { ctx.save(); ctx.rotate(i * TAU / 16); petal(S * p, S * .17 * p); ctx.restore(); }
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(0, 0, S * .22 * p, 0, TAU); ctx.fill();
+  },
+  sunflower(S, p, f) {
+    ctx.fillStyle = '#f7b500';
+    for (let i = 0; i < 22; i++) { ctx.save(); ctx.rotate(i * TAU / 22); petal(S * 1.05 * p, S * .15 * p); ctx.restore(); }
+    ctx.fillStyle = '#ffd000';
+    for (let i = 0; i < 22; i++) { ctx.save(); ctx.rotate((i + .5) * TAU / 22); petal(S * .85 * p, S * .13 * p); ctx.restore(); }
+    ctx.fillStyle = '#4a2a10'; ctx.beginPath(); ctx.arc(0, 0, S * .38 * p, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#b8793a';
+    for (let i = 1; i < 70; i++) {
+      const r = S * .36 * p * Math.sqrt(i / 70), a = i * GOLD;
+      ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, S * .02 * p + .4, 0, TAU); ctx.fill();
+    }
+  },
+  tulip(S, p, f) {
+    const c = `hsl(${f.hue},85%,58%)`, c2 = `hsl(${f.hue},90%,70%)`;
+    ctx.fillStyle = c;
+    ctx.save(); ctx.rotate(-.38); petal(S * 1.2 * p, S * .5 * p); ctx.restore();
+    ctx.save(); ctx.rotate(.38); petal(S * 1.2 * p, S * .5 * p); ctx.restore();
+    ctx.fillStyle = c2; petal(S * 1.25 * p, S * .45 * p);
+  },
+  cherry(S, p, f) {
+    for (let i = 0; i < 5; i++) {
+      ctx.save(); ctx.rotate(i * TAU / 5);
+      ctx.fillStyle = '#ffc2dc'; petal(S * .95 * p, S * .42 * p);
+      ctx.fillStyle = '#ff8fbd'; petal(S * .4 * p, S * .12 * p);
+      ctx.restore();
+    }
+    ctx.strokeStyle = '#ffe36b'; ctx.lineWidth = 1;
+    for (let i = 0; i < 9; i++) {
+      const a = i * TAU / 9, r = S * .33 * p;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); ctx.stroke();
+    }
+  },
+  rose(S, p, f) {
+    for (let k = 0; k < 5; k++) {
+      ctx.fillStyle = `hsl(${f.hue},${70 + k * 5}%,${60 - k * 9}%)`;
+      const n = 5, len = S * (1 - k * .17) * p, wid = S * (.5 - k * .06) * p;
+      for (let i = 0; i < n; i++) { ctx.save(); ctx.rotate(i * TAU / n + k * 1.1); petal(len, wid); ctx.restore(); }
+    }
+  },
+  lavender(S, p, f) {
+    const n = Math.round(14 * p);
+    ctx.fillStyle = `hsl(${f.hue},70%,68%)`;
+    for (let i = 0; i < n; i++) {
+      const y = -i * S * .1, w = S * .12 * (1 - i / 18);
+      ctx.beginPath(); ctx.ellipse(-w, y, S * .07, S * .05, -.5, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(w, y - S * .04, S * .07, S * .05, .5, 0, TAU); ctx.fill();
+    }
+  }
+};
+
+const flowers = [];
+let hq = [];
+function nextH() {
+  if (!hq.length) hq = Array.from({ length: 14 }, (_, i) => .34 + .54 * i / 13).sort(() => Math.random() - .5);
+  return hq.pop() + rnd(-.02, .02);
+}
+function plant(x) {
+  const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+  const hueMap = { tulip: rnd(-10, 330), rose: rnd(335, 365), lavender: rnd(255, 285) };
+  flowers.push({
+    x: x ?? rnd(30, W - 30), type,
+    hue: ((hueMap[type] ?? 0) + 360) % 360,
+    h: H * nextH() * (type === 'lavender' ? .92 : 1), back: Math.random() < .3,
+    S: rnd(22, 40) * (type === 'sunflower' ? 1.4 : 1) * Math.min(1, Math.max(.7, W / 700)),
+    lean: rnd(-60, 60), ph: rnd(0, TAU), t: 0, fade: 1, dying: false
+  });
+}
+
+function stemPoint(base, cp, top, u) {
+  const m = 1 - u;
+  return [m * m * base[0] + 2 * m * u * cp[0] + u * u * top[0], m * m * base[1] + 2 * m * u * cp[1] + u * u * top[1]];
+}
+
+function draw(f, time) {
+  const stemDur = 1.6, bloomDur = 1.4;
+  const p1 = ease(f.t / stemDur), p2 = ease((f.t - stemDur * .85) / bloomDur);
+  const sway = Math.sin(time * .0012 + f.ph) * 6 * p1;
+  const base = [f.x, H], top = [f.x + f.lean * p1 + sway, H - f.h * p1];
+  const cp = [f.x + f.lean * 1.6 * p1, H - f.h * p1 * .5];
+  ctx.globalAlpha = f.fade;
+  ctx.strokeStyle = '#2f9e4f'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.quadraticCurveTo(cp[0], cp[1], top[0], top[1]); ctx.stroke();
+
+  ctx.fillStyle = '#3cbf62';
+  [[.3, 1], [.52, -1], [.7, 1]].forEach(([u, side]) => {
+    if (p1 < u) return;
+    const lp = ease((p1 - u) / .3), [lx, ly] = stemPoint(base, cp, top, u);
+    ctx.save(); ctx.translate(lx, ly); ctx.rotate(side * 1.0); petal(30 * lp, 8 * lp); ctx.restore();
+  });
+
+  if (p2 > 0) {
+    const ang = Math.atan2(top[0] - cp[0], -(top[1] - cp[1]));
+    ctx.save(); ctx.translate(top[0], top[1]); ctx.rotate(ang + (f.type === 'lavender' ? 0 : time * .00008 * (f.ph - 3)));
+    drawers[f.type](f.S, p2, f);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+let last = 0, spawn = 0, shown = false;
+const MAX = 70;
+const WORDS = [
+  'Чи чадна. Зүгээр л үргэлжлүүл.',
+  'Чамд итгэж байна.',
+  'Жижиг алхам бүр чамайг урагш аваачдаг.',
+  'Чи өөрийнхөө бодсоноос хамаагүй хүчтэй.',
+  'Цэцэг шиг аажуухан ч гэсэн заавал дэлгэрнэ.',
+  'Чиний инээмсэглэл өдрийг гэрэлтүүлдэг.',
+  'Хэзээ ч бүү бууж өг.',
+  'Чи аль хэдийн гайхалтай.',
+  'Амрах нь бас урагшилж байгаа хэрэг.',
+  'Бүх зүйл сайхан болно.',
+  'Чи ганцаараа биш.',
+  'Өнөөдөр чамд сайхан зүйл тохиолдоно.'
+];
+let order = [], msgTimer;
+function nextWord() {
+  if (!order.length) order = WORDS.map((_, i) => i).sort(() => Math.random() - .5);
+  return WORDS[order.pop()];
+}
+function showBtn() { shown = true; document.getElementById('gold').classList.add('show'); }
+document.getElementById('gold').addEventListener('click', () => {
+  const m = document.getElementById('msg');
+  m.classList.remove('show');
+  clearTimeout(msgTimer);
+  setTimeout(() => { m.textContent = nextWord(); m.classList.add('show'); }, 200);
+  msgTimer = setTimeout(() => m.classList.remove('show'), 6000);
+});
+function frame(time) {
+  const dt = Math.min((time - last) / 1000, .05); last = time;
+  ctxF.clearRect(0, 0, W, H); ctxB.clearRect(0, 0, W, H);
+  spawn += dt;
+  if (spawn > .2 && flowers.length < MAX) { spawn = 0; plant(); }
+  if (!shown && flowers.length >= MAX && flowers.every(f => f.t > 3.2)) showBtn();
+  for (let i = flowers.length - 1; i >= 0; i--) {
+    const f = flowers[i]; f.t += dt;
+    if (f.dying) { f.fade -= dt * .6; if (f.fade <= 0) { flowers.splice(i, 1); continue; } }
+    ctx = f.back ? ctxB : ctxF; draw(f, time);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(t => { last = t; frame(t); });
+
+cv.addEventListener('pointerdown', e => {
+  plant(e.clientX);
+  document.getElementById('hint').classList.add('off');
+});
+setTimeout(() => document.getElementById('hint').classList.add('off'), 6000);
+</script>
+</body>
+</html>
